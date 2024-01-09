@@ -1,0 +1,40 @@
+#MAUVE is no longer being maintained and may stop working
+#to maintain the synteny of the poslien plots, it may still be useful to align and reorder draft contigs to a complete reference genome (if available)
+#this code uses BLAST and BioPython to map and reorder draft contigs against a complete reference genome
+
+#create a database from the complete genome
+>~/ncbi-magicblast-1.6.0/bin/makeblastdb -dbtype nucl -in ${ref_genome}.fasta -out ${ref_database}.fasta -parse_seqids
+#map draft genome against reference database
+>~/ncbi-magicblast-1.6.0/bin/magicblast -query ${draft_genome}.fasta -db ${refdatabase}.fasta -infmt fasta -splice F -outfmt tabular -parse_deflines T -perc_identity 80 -out ${draft_genome}.blast
+
+#import python dependencies
+import pandas as pd
+import numpy as np
+import os
+from Bio import SeqIO
+
+
+directory = '/path/to/blast/files'
+for filename in os.listdir(directory): 
+  hits = [] #create an empty list to store sequence records
+
+  path = os.path.join(directory, filename)
+  f = os.path.splitext(filename)[0]
+  f = f.split('.')[0] 
+  #alter this and previous line if you have used a different naming scheme for the blast files. this is used to extract the genome names from the BLAST file names
+
+  #read in and sort the blast file
+  df = pd.read_table(path, sep ='\t')
+  df = df.sort_values(by=['query start'], key=lambda col: col.replace(0, np.nan), na_position='last')
+  #this sorts the contigs in ascending order that they appear in the reference genome. Any unaligned contigs are listed at the end of the file
+
+  #extract and save contigs in the order that they appear in the blast file
+  #specify the paths to the directory containing the draft genomes as well as the directory where you would like to save the reordered genomes
+  for i in df['query acc.']:
+    for record in SeqIO.parse('/path/to/genomes/{}.fna'.format(f), 'fasta'):
+      if record.id==i:
+        hits.append(record)
+
+  SeqIO.write(hits, '/path/to/reordered/genomes/{}_reordered.fna'.format(f), 'fasta')
+
+  print(f, " genome successfully reordered")
